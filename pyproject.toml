@@ -1,0 +1,76 @@
+[project]
+name = "E.V"
+version = "0.1.0"
+description = "Agentic personal assistant: trip planning, calendar, email, and task coordination via MCP + LangGraph"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    # --- Web framework ---
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.8.0",
+    "pydantic-settings>=2.4.0",
+
+    # --- Orchestration ---
+    "langgraph>=0.2.20",
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-ollama>=0.2.0",
+
+    # --- MCP ---
+    "mcp>=1.0.0",
+
+    # --- Google APIs ---
+    "google-api-python-client>=2.140.0",
+    "google-auth>=2.34.0",
+    "google-auth-oauthlib>=1.2.1",
+
+    # --- Memory / vector store ---
+    "chromadb>=0.5.5",
+    "sentence-transformers>=3.0.1",
+
+    # --- State / cache ---
+    "redis>=5.0.8",
+
+    # --- Database ---
+    "sqlalchemy>=2.0.32",
+    "alembic>=1.13.2",
+
+    # --- Utilities ---
+    "python-dotenv>=1.0.1",
+    "httpx>=0.27.0",
+    "tenacity>=9.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.2",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.6.3",
+    "mypy>=1.11.1",
+    "httpx>=0.27.0",
+]
+
+# Optional hosted LLM fallbacks (free tiers)
+hosted-llm = [
+    "langchain-groq>=0.2.0",
+    "langchain-google-genai>=2.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

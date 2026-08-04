@@ -1,0 +1,78 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: assistant-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: assistant-app
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./data:/app/data
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # --- MCP tool servers (each exposes one domain of tools) ---
+  mcp-calendar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: assistant-mcp-calendar
+    env_file:
+      - .env
+    ports:
+      - "9001:9001"
+    command: python -m app.mcp.servers.calendar_server
+
+  mcp-email:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: assistant-mcp-email
+    env_file:
+      - .env
+    ports:
+      - "9002:9002"
+    command: python -m app.mcp.servers.email_server
+
+  mcp-tasks:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: assistant-mcp-tasks
+    env_file:
+      - .env
+    ports:
+      - "9003:9003"
+    command: python -m app.mcp.servers.tasks_server
+
+volumes:
+  redis_data:
+
+# Note: Ollama runs on your host machine (not in Docker) — install it separately
+# from https://ollama.com and run `ollama pull llama3.1:8b`.
+# `host.docker.internal` lets containers reach it; on Linux you may need to add:
+#   extra_hosts:
+#     - "host.docker.internal:host-gateway"

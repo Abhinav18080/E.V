@@ -1,0 +1,59 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.Python
+build/
+dist/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+credentials.json
+token.json
+
+# --- Databases ---
+*.db
+*.sqlite3
+dev.db
+
+# --- Vector store / data ---
+data/chroma/
+data/
+
+# --- Redis dump ---
+dump.rdb
+
+# --- Testing / coverage ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Type checking / linting caches ---
+.mypy_cache/
+.ruff_cache/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Alembic ---
+# (keep migration versions, ignore local db state only)
