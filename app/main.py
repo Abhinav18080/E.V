@@ -61,12 +61,13 @@ async def health() -> dict:
 
 
 # --- Routers ---
-# Uncomment each include as its route module is implemented.
-#
-# from app.api.routes import chat, calendar, email, tasks, approvals, auth
-# app.include_router(chat.router, prefix="/chat", tags=["chat"])
-# app.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
-# app.include_router(email.router, prefix="/email", tags=["email"])
-# app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
-# app.include_router(approvals.router, prefix="/approvals", tags=["approvals"])
-# app.include_router(auth.router, prefix="/auth", tags=["auth"])
+# chat/calendar/email return 501 until their underlying integrations
+# (agent graph, Google clients) are built — see TODOs in each route module.
+from app.api.routes import approvals, auth, calendar, chat, email, tasks
+
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
+app.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
+app.include_router(email.router, prefix="/email", tags=["email"])
+app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
+app.include_router(approvals.router, prefix="/approvals", tags=["approvals"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
