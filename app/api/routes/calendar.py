@@ -11,28 +11,11 @@ hitting the Google client here. Left as 501s until that integration lands.
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
 
+from app.api.schemas.calendar import CalendarEvent, CreateEventRequest
 from app.dependencies import CurrentUserDep
 
 router = APIRouter()
-
-
-class CalendarEvent(BaseModel):
-    id: str | None = None
-    summary: str
-    start: datetime
-    end: datetime
-    description: str | None = None
-    attendees: list[str] = Field(default_factory=list)
-
-
-class CreateEventRequest(BaseModel):
-    summary: str
-    start: datetime
-    end: datetime
-    description: str | None = None
-    attendees: list[str] = Field(default_factory=list)
 
 
 @router.get("/events", response_model=list[CalendarEvent])

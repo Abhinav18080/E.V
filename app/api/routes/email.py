@@ -8,32 +8,11 @@ through app.agent.nodes.approval_gate rather than sending directly.
 """
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
 
+from app.api.schemas.email import EmailSummary, SendEmailRequest, SendEmailResponse
 from app.dependencies import CurrentUserDep
 
 router = APIRouter()
-
-
-class EmailSummary(BaseModel):
-    id: str
-    subject: str
-    sender: str
-    snippet: str
-    received_at: str
-    unread: bool = True
-
-
-class SendEmailRequest(BaseModel):
-    to: list[EmailStr]
-    subject: str
-    body: str
-    cc: list[EmailStr] = Field(default_factory=list)
-
-
-class SendEmailResponse(BaseModel):
-    message_id: str
-    status: str
 
 
 @router.get("/inbox", response_model=list[EmailSummary])

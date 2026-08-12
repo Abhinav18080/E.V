@@ -1,9 +1,6 @@
 """
 POST /chat — the main agent entrypoint.
 
-Request/response models live inline here for now; move to
-app/api/schemas/chat.py once they stabilize.
-
 Conversation turns are appended to a per-thread list in Redis so history
 survives across requests (short-term memory). The actual model call is
 wired to app.agent.graph once that's built — see TODO below.
@@ -14,36 +11,14 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
 
+from app.api.schemas.chat import ChatMessage, ChatRequest, ChatResponse
 from app.dependencies import CurrentUserDep, RedisDep
 
 router = APIRouter()
 
 THREAD_KEY_PREFIX = "thread:"
 THREAD_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days
-
-
-class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, description="The user's message to the assistant")
-    thread_id: str | None = Field(
-        default=None, description="Existing conversation thread id. Omit to start a new thread."
-    )
-
-
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-    timestamp: str
-
-
-class ChatResponse(BaseModel):
-    thread_id: str
-    reply: str
-    pending_approval_id: str | None = Field(
-        default=None,
-        description="Set when the agent paused for human approval instead of replying directly.",
-    )
 
 
 def _thread_key(thread_id: str) -> str:

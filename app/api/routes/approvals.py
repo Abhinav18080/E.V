@@ -16,12 +16,11 @@ the graph-resume half of the loop is a TODO until app/agent/graph.py exists.
 import json
 import uuid
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
 
+from app.api.schemas.approval import ApprovalDecision, ApprovalRequest, ApprovalStatus
 from app.dependencies import CurrentUserDep, RedisDep
 
 router = APIRouter()
@@ -29,29 +28,6 @@ router = APIRouter()
 APPROVAL_KEY_PREFIX = "approval:"
 APPROVAL_INDEX_KEY_PREFIX = "approvals_by_user:"
 APPROVAL_TTL_SECONDS = 60 * 60 * 24 * 3  # 3 days
-
-
-class ApprovalStatus(str, Enum):
-    pending = "pending"
-    approved = "approved"
-    rejected = "rejected"
-    expired = "expired"
-
-
-class ApprovalRequest(BaseModel):
-    id: str
-    thread_id: str
-    action_type: str = Field(..., description="e.g. 'send_email', 'create_calendar_event'")
-    summary: str = Field(..., description="Human-readable description of the pending action")
-    payload: dict[str, Any] = Field(..., description="The actual action arguments, for execution on approval")
-    status: ApprovalStatus = ApprovalStatus.pending
-    created_at: datetime
-    decided_at: datetime | None = None
-
-
-class ApprovalDecision(BaseModel):
-    approve: bool
-    reason: str | None = None
 
 
 def _approval_key(approval_id: str) -> str:
