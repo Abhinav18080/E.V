@@ -1,23 +1,17 @@
 """
 Responder node — turns the final state into a reply message appended to
 `messages`. Runs after planner decides to respond directly, or after
-executor has run a tool (or a human rejected it via approval_gate).
-
-TODO: move SYSTEM_PROMPT into app/agent/prompts/ once that folder exists.
+executor has run a tool (or a human rejected it via approval_gate). Prompt
+text lives in app/agent/prompts/system.py and tool_use_prompt.py.
 """
 
 from langchain_core.messages import AIMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
+from app.agent.prompts.system import BASE_SYSTEM_PROMPT
+from app.agent.prompts.tool_use_prompt import RESPONDER_TOOL_RESULT_PROMPT
 from app.agent.state import AgentState
 from app.config import get_settings
-
-SYSTEM_PROMPT = (
-    "You are a helpful personal assistant. Write a short, natural reply to "
-    "the user based on the conversation so far. If a tool result is provided "
-    "below, summarize what happened in plain language. If an action was "
-    "rejected by the user during approval, acknowledge that without retrying it."
-)
 
 
 def _get_model() -> ChatOllama:
@@ -26,11 +20,12 @@ def _get_model() -> ChatOllama:
 
 
 async def responder(state: AgentState) -> dict:
-    messages = [SystemMessage(content=SYSTEM_PROMPT)]
+    messages = [SystemMessage(content=BASE_SYSTEM_PROMPT)]
 
     tool_result = state.get("tool_result")
     if tool_result:
-        messages.append(SystemMessage(content=f"Latest tool result: {tool_result}"))
+        messages.append(SystemMessage(content=RESPONDER_TOOL_RESULT_PROMPT))
+        messages.append(SystemMessage(content=f"Tool result: {tool_result}"))
 
     messages.extend(state["messages"])
 
