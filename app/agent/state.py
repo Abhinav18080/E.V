@@ -22,6 +22,21 @@ class PendingApproval(TypedDict):
     payload: dict[str, Any]
 
 
+class ToolCall(TypedDict):
+    """The tool the planner decided to invoke, for executor to run."""
+
+    name: str
+    args: dict[str, Any]
+
+
+class ToolResult(TypedDict):
+    """Outcome of executor running (or having a human reject) a tool call."""
+
+    status: Literal["ok", "rejected", "error"]
+    tool_name: str
+    result: Any
+
+
 class AgentState(TypedDict):
     # --- Conversation ---
     # add_messages appends new messages and handles de-duping/merging by id,
@@ -36,6 +51,14 @@ class AgentState(TypedDict):
     # Set by the planner node; read by the graph's conditional edges to
     # decide where to route next. See route_after_planner in graph.py.
     next_action: Literal["tool_call", "respond", "await_approval", "end"] | None
+
+    # The tool the planner chose to invoke, for executor to run. None when
+    # next_action is "respond".
+    tool_call: ToolCall | None
+
+    # Set by executor once a tool has actually run (or a human rejected it),
+    # for responder to summarize back to the user.
+    tool_result: ToolResult | None
 
     # --- Memory ---
     # Long-term facts/preferences retrieved for this turn from the vector
