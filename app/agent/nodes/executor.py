@@ -9,14 +9,12 @@ app/agent/graph.py) rather than running the action immediately. Once a human
 approves and the graph resumes, this node runs again with
 state["approval_decision"] set, and either executes the tool or records the
 rejection.
-
-TODO: replace _call_mcp_tool's body with a real call through app.mcp.client
-once the MCP servers (app/mcp/servers/*.py) exist.
 """
 
 from typing import Any
 
 from app.agent.state import AgentState, PendingApproval, ToolResult
+from app.mcp.client import MCPToolError, call as call_mcp_tool
 
 SIDE_EFFECTING_TOOLS = {"calendar.create_event", "email.send"}
 
@@ -29,13 +27,6 @@ def _summarize_action(tool_name: str, tool_args: dict[str, Any]) -> str:
     return f"Run {tool_name} with {tool_args}"
 
 
-async def _call_mcp_tool(tool_name: str, tool_args: dict[str, Any]) -> Any:
-    # TODO: dispatch via app.mcp.client, e.g.:
-    #   from app.mcp.client import call_tool
-    #   return await call_tool(tool_name, tool_args)
-    raise NotImplementedError(f"MCP tool '{tool_name}' isn't wired up yet")
-
-
 async def executor(state: AgentState) -> dict:
     tool_call = state.get("tool_call")
     if not tool_call:
@@ -43,7 +34,7 @@ async def executor(state: AgentState) -> dict:
         return {}
 
     tool_name = tool_call["name"]
-    tool_args = tool_call["args"]
+    tool_args = {**tool_call["args"], "user_id": state["user_id"]}
 
     needs_approval = tool_name in SIDE_EFFECTING_TOOLS
     decision = state.get("approval_decision")
@@ -64,6 +55,10 @@ async def executor(state: AgentState) -> dict:
         return {"pending_approval": None, "approval_decision": None, "tool_result": result}
 
     # Either approved, or the tool never needed approval in the first place.
-    raw_result = await _call_mcp_tool(tool_name, tool_args)
-    result: ToolResult = {"status": "ok", "tool_name": tool_name, "result": raw_result}
+    try:
+        raw_result = await call_mcp_tool(tool_name, tool_args)
+        result: ToolResult = {"status": "ok", "tool_name": tool_name, "result": raw_result}
+    except MCPToolError as exc:
+        result: ToolResult = {"status": "error", "tool_name": tool_name, "result": str(exc)}
+
     return {"pending_approval": None, "approval_decision": None, "tool_result": result}
