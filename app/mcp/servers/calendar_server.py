@@ -1,15 +1,13 @@
 """
 MCP server exposing Google Calendar tools.
 
-Tool bodies are stubs until app/integrations/google/calendar_client.py
-exists — each raises NotImplementedError, which FastMCP surfaces to callers
-as a tool error (app/mcp/client.py turns that into an MCPToolError).
-
 Run directly:      python -m app.mcp.servers.calendar_server
 Or via Compose:     docker compose up mcp-calendar
 """
 
 from mcp.server.fastmcp import FastMCP
+
+from app.integrations.google import calendar_client
 
 mcp = FastMCP("calendar-server", host="0.0.0.0", port=9001)
 
@@ -17,8 +15,7 @@ mcp = FastMCP("calendar-server", host="0.0.0.0", port=9001)
 @mcp.tool(name="calendar.list_events")
 async def list_events(user_id: str, start: str, end: str) -> list[dict]:
     """List the user's calendar events between `start` and `end` (ISO 8601 datetimes)."""
-    # TODO: wire to app.integrations.google.calendar_client.list_events(user_id, start, end)
-    raise NotImplementedError("Google Calendar integration not wired up yet")
+    return await calendar_client.list_events(user_id, start, end)
 
 
 @mcp.tool(name="calendar.create_event")
@@ -37,8 +34,7 @@ async def create_event(
     human has approved the action via the approval flow — this server has
     no independent notion of approval, it just performs the write.
     """
-    # TODO: wire to app.integrations.google.calendar_client.create_event(...)
-    raise NotImplementedError("Google Calendar integration not wired up yet")
+    return await calendar_client.create_event(user_id, summary, start, end, description, attendees)
 
 
 if __name__ == "__main__":
