@@ -2,24 +2,31 @@
 Google OAuth flow.
 
 GET /auth/login   -> redirects the user to Google's consent screen
-GET /auth/callback -> exchanges the auth code for tokens, creates a session,
-                       and sets the session cookie that app.dependencies
-                       reads to resolve the current user.
+GET /auth/callback -> exchanges the auth code for tokens, looks up/creates
+                       the User row, creates a session, and sets the
+                       session cookie that app.dependencies reads to
+                       resolve the current user.
 
 Google API tokens (access + refresh) are stored server-side (Redis for now,
 keyed by user_id) so app.integrations.google.* clients can use them later
-without the user re-authenticating on every request.
+without the user re-authenticating on every request. The User record itself
+lives in the DB (app/db/models.py) — Redis holds the hot-path session-token
+lookup and the tokens, not the durable identity.
 """
 
+import asyncio
+import hashlib
 import secrets
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
 
 from app.config import get_settings
+from app.db.models import User, UserSession
+from app.db.session import SessionLocal
 from app.dependencies import RedisDep
 
 router = APIRouter()
@@ -54,6 +61,48 @@ def _build_flow() -> Flow:
     )
 
 
+def _get_or_create_user(email: str, google_user_id: str, display_name: str | None) -> User:
+    """
+    Look up the User by google_user_id (falling back to email, in case a
+    user's Google account id ever changes but their email doesn't), or
+    create one. Synchronous — SQLAlchemy's Session isn't async here, so
+    callers run this via asyncio.to_thread rather than blocking the event
+    loop directly.
+    """
+    with SessionLocal() as db:
+        user = (
+            db.query(User)
+            .filter((User.google_user_id == google_user_id) | (User.email == email))
+            .first()
+        )
+        if user:
+            # Keep google_user_id/display_name current in case either changed.
+            user.google_user_id = google_user_id
+            user.display_name = display_name
+            db.commit()
+            db.refresh(user)
+            return user
+
+        user = User(email=email, google_user_id=google_user_id, display_name=display_name)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+
+def _record_session(user_id: str, session_token: str, expires_at: datetime) -> None:
+    """Durable login-history row — see UserSession's docstring in app/db/models.py."""
+    with SessionLocal() as db:
+        db.add(
+            UserSession(
+                user_id=user_id,
+                session_token_hash=hashlib.sha256(session_token.encode()).hexdigest(),
+                expires_at=expires_at,
+            )
+        )
+        db.commit()
+
+
 @router.get("/login")
 async def login(redis_client: RedisDep) -> RedirectResponse:
     flow = _build_flow()
@@ -80,10 +129,16 @@ async def callback(request: Request, response: Response, redis_client: RedisDep)
     flow.fetch_token(authorization_response=str(request.url))
     credentials = flow.credentials
 
-    # TODO: once app/db/models.py has a User table, look up/create the user
-    # by their Google profile (fetch via `credentials` + googleapiclient) and
-    # use its real id here instead of minting a bare uuid each login.
-    user_id = str(uuid.uuid4())
+    # Fetch the user's Google profile (needs the userinfo.email/profile
+    # scopes added in app/config.py's GOOGLE_SCOPES) so we can look up/create
+    # a real User row instead of minting a throwaway id each login.
+    userinfo_service = build("oauth2", "v2", credentials=credentials, static_discovery=True)
+    profile = await asyncio.to_thread(lambda: userinfo_service.userinfo().get().execute())
+
+    user = await asyncio.to_thread(
+        _get_or_create_user, profile["email"], profile["id"], profile.get("name")
+    )
+    user_id = user.id
 
     await redis_client.set(
         f"{GOOGLE_TOKENS_KEY_PREFIX}{user_id}",
@@ -91,9 +146,11 @@ async def callback(request: Request, response: Response, redis_client: RedisDep)
     )
 
     session_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=SESSION_TTL_SECONDS)
     await redis_client.set(
         f"{SESSION_KEY_PREFIX}{session_token}", user_id, ex=SESSION_TTL_SECONDS
     )
+    await asyncio.to_thread(_record_session, user_id, session_token, expires_at)
 
     response.set_cookie(
         key="session_token",
@@ -106,6 +163,7 @@ async def callback(request: Request, response: Response, redis_client: RedisDep)
     return {
         "status": "authenticated",
         "user_id": user_id,
+        "email": user.email,
         "authenticated_at": datetime.now(timezone.utc).isoformat(),
     }
 
