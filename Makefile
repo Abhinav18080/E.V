@@ -34,6 +34,13 @@ mcp-email:
 mcp-tasks:
 	python -m app.mcp.servers.tasks_server
 
+mcp-all:
+	./scripts/run_local_mcp_servers.sh
+
+# --- Dev data ---
+seed:
+	python3 scripts/seed_dev_data.py
+
 # --- Quality ---
 test:
 	pytest -v --cov=app --cov-report=term-missing
